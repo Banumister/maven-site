@@ -17,42 +17,89 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
-The configuration for Apache Maven usage itself and projects built with resides 
-in a number of places: 
 
-## `MAVEN_OPTS` environment variable:
+Apache Maven ships with two launcher commands in the `${MAVEN_HOME}/bin` directory,
+which &mdash; based on several environment variables, project files and system files as described below
+&mdash; constructs and runs the appropriate `java ...` command line which then invokes the Java Virtual Machine (JVM) 
+that actually runs Maven.
 
-This variable contains parameters used to start up the JVM running Maven and
-can be used to supply additional options to it. E.g. JVM memory
-settings could be defined with the value `-Xms256m -Xmx512m`.
+* `mvn`: normal way to run from the command line.
+* `mvnDebug`: launches `mvn` in debug mode, waiting for a Java debugger to attach to the address specified in `$MAVEN_DEBUG_ADDRESS` (default 8000).
 
-## `MAVEN_ARGS` environment variable:
+
+## Environment variables
+
+In the following the Unix syntax for environment variables is used in the text.
+
+For Windows the syntax is slightly different, for `$A` use `%A%`.
+
+### `$MAVEN_OPTS` / `%MAVEN_OPTS%`
+
+The content of this variable is placed in the `java` command _before_ the class name, and 
+can therefore be used to provide additional arguments to the Java Virtual Machine (JVM) without
+having to specify them on the command line every time.
+
+Examples include garbage collector and memory configuration, but _not_ options to Maven itself.
+
+Use `java -help` and `java -X` to see what is possible in this particular JVM.
+
+<!--
+### `$MAVEN_ARGS`
 
 Starting with Maven 4, this variable contains arguments passed to Maven before
 CLI arguments. E.g., options and goals could be defined with the value
 `-B -V checkstyle:checkstyle`.
+-->
 
-## `settings.xml` file:
 
-Located in USER_HOME/.m2 the settings files is designed to contain any
-configuration for Maven usage across projects.
+### `$MAVEN_SKIP_RC` / `%MAVEN_SKIP_RC%`
 
-## `.mvn` directory:
+If set, tells the launcher scripts _not_ to run the various Maven command scripts before and after running the Maven JVM.
+This is useful to get standard behavior.
 
-Located within the project's top level directory, the files `maven.config`, `jvm.config`, and `extensions.xml`
-contain project specific configuration for running Maven.
+### `$JAVA_HOME` / `%JAVA_HOME%`
 
-This directory is part of the project and may be checked in into your version control.
+If set, the Java executable to be used must be found at `$JAVA_HOME/bin/java` or an error will
+be reported.  If not set, the Java executable is found in the `$PATH`.
 
-### `.mvn/extensions.xml` file:
+### `$MAVEN_DEBUG_OPTS` / `%MAVEN_DEBUG_OPTS%`
 
-The old way (up to Maven 3.2.5) was to create a jar (must be shaded if you have other dependencies) which contains the extension and put 
-it manually into the `${MAVEN_HOME}/lib/ext` directory. This means you had to change the Maven installation. The consequence was that everyone
-who likes to use this needed to change it’s installation and makes the on-boarding for a developer much more inconvenient. The other 
-option was to give the path to the jar on command line via `mvn -Dmaven.ext.class.path=extension.jar`. This has the drawback giving those 
-options to your Maven build every time you are calling Maven. Not very convenient as well.
+Additional options for the JVM if needed.  
+They are put after `$MAVEN_OPTS` and before the `-classpath` argument.
 
-From now on this can be done much more simpler and in a more Maven like way. So you can define an `${maven.projectBasedir}/.mvn/extensions.xml` file which looks like the following:
+## Files
+
+`${project.basedir}` refers to the top directory of the project.
+
+### `$HOME/.m2/settings.xml` - `%USERPROFILE%\.m2\settings.xml`
+
+This contains the user-specific Maven setup used across projects.  
+Often this is used to tell Maven to use an internal repository 
+instead of Maven Central if behind a firewall, 
+various profiles, and passwords.
+
+
+### `${project.basedir}/.mvn/jvm.config`:
+
+Allows a persistent alternative in the current project to `$MAVEN_OPTS` for providing 
+additional arguments to the JVM before the class name on the constructed 
+`java ...` command line.  Sample contents: 
+
+        -Xmx2048m -Xms1024m -XX:MaxPermSize=512m -Djava.awt.headless=true
+
+Word of caution:  If you for any reason need to configure memory usage or the garbage collector
+be absolutely certain that the configuration you use 
+applies to the version of the JVM you are using, and that you understand what you are doing.
+
+
+<!--
+### `${project.basedir}/.mvn/extensions.xml`
+
+FIXME:  WHERE IS THIS DONE?  IS THIS MAVEN 4 FUNCTIONALITY?  Commented out for now.
+
+If you for any reason needs additional artifacts put on the classpath used by Maven
+in the current project, simply list them here with their usual Maven coordinates.
+
 
 ```xml
 <extensions xmlns="http://maven.apache.org/EXTENSIONS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -64,27 +111,19 @@ From now on this can be done much more simpler and in a more Maven like way. So 
   </extension>
 </extensions>
 ```
+-->
 
-Now you can simply use an extension by defining the usual maven coordinates groupId, artifactId, version as any other artifact. Furthermore all transitive dependencies of those extensions will automatically being downloaded from your repository. So no need to create a shaded artifact anymore.
+### `/usr/local/etc/mavenrc` + `/etc/mavenrc` + `$HOME/.mavenrc`
 
-### `.mvn/maven.config` file:
+Unix-like systems only: 
+Configuration files executed by the Unix launcher scripts first thing, unless
+the environment variable `$MAVEN_SKIP_RC` is set.
 
-It’s really hard to define a general set of options for calling the maven command line. Starting with Maven 3.3.1+, this can be solved by 
-putting this 
-options to a script but this can now simple being done by defining `${maven.projectBasedir}/.mvn/maven.config` file which contains the 
-configuration options for the `mvn` command line. 
+Typically, environment variables including `$PATH` are set here.
 
-For example things like `-T3 -U --fail-at-end`. So you only have to call Maven just by using `mvn 
-clean package` instead of `mvn -T3 -U --fail-at-end clean package` and not to miss the `-T3 -U --fail-at-end` options on every call. The 
-`${maven.projectBasedir}/.mvn/maven.config` is located in the `${maven.projectBasedir}/.mvn/` directory; also works if in the root of a multi module build.
 
-### `.mvn/jvm.config` file:
+---
 
-Starting with Maven 3.3.1+ you can define JVM configuration via `${maven.projectBasedir}/.mvn/jvm.config` file which means you can define the options for your build on a per project base. This file will become part of your project and will be checked in along with your project. So no need anymore for `MAVEN_OPTS`, `.mavenrc` files. So for example if you put the following JVM options into the `${maven.projectBasedir}/.mvn/jvm.config` file
-
-        -Xmx2048m -Xms1024m -XX:MaxPermSize=512m -Djava.awt.headless=true
-
-You don't need to use these options in `MAVEN_OPTS` or switch between different configurations.
 
 ## Other guides
 
