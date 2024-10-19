@@ -51,4 +51,4 @@ Additional Resources
 [cla]: https://www.apache.org/licenses/#clas
 [build]: https://ci-maven.apache.org/job/Maven/job/maven-box/job/maven-site/job/master/
 
-----------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------
